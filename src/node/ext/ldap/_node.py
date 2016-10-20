@@ -508,7 +508,7 @@ class LDAPStorage(OdictStorage):
                 resattr = dict()
                 for k, v in attrs.iteritems():
                     if k in attrlist:
-                        if self.attrs.is_binary(k):
+                        if k in self.root._binary_attributes:
                             resattr[decode(k)] = v
                         else:
                             resattr[decode(k)] = decode(v)
