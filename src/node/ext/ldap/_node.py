@@ -63,8 +63,8 @@ class LDAPAttributesBehavior(Behavior):
             return
         # clear in case reload
         self.clear()
-        # query all attributes
-        attrlist = ['*']
+        # query given or default attributes
+        attrlist = ldap_node.root.search_attrlist
 
         # XXX: operational attributes
         # if self.session._props.operationalAttributes:
@@ -75,12 +75,18 @@ class LDAPAttributesBehavior(Behavior):
         #    attrlist.append('memberOf')
 
         # fetch attributes for ldap_node
-        entry = ldap_node.ldap_session.search(
-            scope=BASE,
-            baseDN=ldap_node.DN.encode('utf-8'),
-            force_reload=ldap_node._reload,
-            attrlist=attrlist,
-        )
+        if ldap_node.search_criteria:
+            entry = ldap_node.root.search(
+                criteria=ldap_node.search_criteria,
+                attrlist=attrlist
+            )
+        else:
+            entry = ldap_node.ldap_session.search(
+                scope=BASE,
+                baseDN=ldap_node.DN.encode('utf-8'),
+                force_reload=ldap_node._reload,
+                attrlist=attrlist,
+            )
         # result length must be 1
         if len(entry) != 1:
             raise RuntimeError(                            # pragma NO COVERAGE
@@ -198,6 +204,7 @@ class LDAPStorage(OdictStorage):
         # search related defaults
         self.search_scope = ONELEVEL
         self.search_filter = None
+        self.search_attrlist = ['*']
         self.search_criteria = None
         self.search_relation = None
         # creation related default
@@ -219,7 +226,7 @@ class LDAPStorage(OdictStorage):
                 res = self.ldap_session.search(
                     scope=BASE,
                     baseDN=val.DN.encode('utf-8'),
-                    attrlist=[''],  # no need for attrs
+                    attrlist=self.root.search_attrlist
                 )
                 # remember DN
                 val._dn = res[0][0]
@@ -245,7 +252,7 @@ class LDAPStorage(OdictStorage):
             self.ldap_session.search(
                 scope=BASE,
                 baseDN=val.DN.encode('utf-8'),
-                attrlist=[''],  # no need for attrs
+                attrlist=self.root.search_attrlist,
             )
         except (NO_SUCH_OBJECT, INVALID_DN_SYNTAX):
             # the value is not yet in the directory
@@ -295,7 +302,7 @@ class LDAPStorage(OdictStorage):
                 res = self.ldap_session.search(
                     scope=ONELEVEL,
                     baseDN=encode(self.DN),
-                    attrlist=[''],
+                    attrlist=self.root.search_attrlist,
                     page_size=self._page_size,
                     cookie=cookie,
                 )

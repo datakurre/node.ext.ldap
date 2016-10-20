@@ -132,6 +132,8 @@ class ILDAPStorage(IStorage):
 
     search_filter = Attribute(u'Default child search filter')
 
+    search_attrlist = Attribute(u'Default child search attrlist')
+
     search_criteria = Attribute(u'Default child search criteria')
 
     search_relation = Attribute(u'Default child search relation')

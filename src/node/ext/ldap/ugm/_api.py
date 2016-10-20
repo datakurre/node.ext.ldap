@@ -186,11 +186,16 @@ class LDAPPrincipal(AliasedPrincipal):
         delivered in LDAP response unless explicitly queried. Thus a separate
         property is used to query memberOf information explicit.
         """
-        entry = self.context.ldap_session.search(
-            scope=BASE,
-            baseDN=self.context.DN.encode('utf-8'),
-            force_reload=self.context._reload,
-            attrlist=['memberOf'])
+        if self.context.search_criteria:
+            entry = self.context.root.search(
+                criteria=self.context.search_criteria,
+                attrlist=self.context.root.search_attrlist)
+        else:
+            entry = self.context.ldap_session.search(
+                scope=BASE,
+                baseDN=self.context.DN.encode('utf-8'),
+                force_reload=self.context._reload,
+                attrlist=self.context.root.search_attrlist)
         return entry[0][1].get('memberOf', list())
 
 
@@ -321,7 +326,7 @@ class LDAPGroupMapping(Behavior):
             if gcfg and gcfg.memberOfSupport:
                 users = ugm.users
                 criteria = {'memberOf': self.context.DN}
-                attrlist = [users._key_attr]
+                attrlist = users.context.search_attrlist
                 matches_generator = users.context.batched_search(
                     criteria=criteria,
                     attrlist=attrlist,
@@ -436,6 +441,9 @@ class LDAPPrincipals(OdictStorage):
         self.principal_attrmap = cfg.attrmap
         self.principal_attraliaser = DictAliaser(cfg.attrmap, cfg.strict)
         self.context = context
+        self.context.root.search_attrlist = list(sorted(set(
+            self.principal_attrmap.values() + ['rdn', 'memberOf']
+        )))
 
     @default
     def idbydn(self, dn, strict=False):
@@ -468,7 +476,7 @@ class LDAPPrincipals(OdictStorage):
             return self.storage[key]
         except KeyError:
             criteria = {self._key_attr: key}
-            attrlist = ['rdn', self._key_attr]
+            attrlist = self.context.root.search_attrlist
             res = self.context.search(criteria=criteria, attrlist=attrlist)
             if not res:
                 raise KeyError(key)
@@ -483,7 +491,17 @@ class LDAPPrincipals(OdictStorage):
             path = dn.split(',')[:len(self.context.DN.split(',')) * -1]
             context = self.context
             for rdn in reversed(path):
+                if rdn not in context.storage:
+                    val = context.child_factory()
+                    val.__name__ = rdn
+                    val.__parent__ = context
+                    # remember DN
+                    val._dn = u'{0:s},{1:s}'.format(
+                        rdn.decode('utf-8'), context._dn or context.__name__)
+                    val._ldap_session = context.ldap_session
+                    context.storage[rdn] = val
                 context = context[rdn]
+            context.search_criteria = criteria
             principal = self.principal_factory(
                 context,
                 attraliaser=self.principal_attraliaser
@@ -496,7 +514,7 @@ class LDAPPrincipals(OdictStorage):
     @default
     @locktree
     def __iter__(self):
-        attrlist = ['rdn', self._key_attr]
+        attrlist = self.context.root.search_attrlist
         for principal in self.context.batched_search(attrlist=attrlist):
             prdn = principal[1]['rdn']
             if prdn in self.context._deleted_children:
@@ -583,7 +601,7 @@ class LDAPPrincipals(OdictStorage):
                exact_match=False, or_search=False, or_keys=None,
                or_values=None, page_size=None, cookie=None):
         search_attrlist = [self._key_attr]
-        if attrlist is not None and self._key_attr not in attrlist:
+        if attrlist is not None:
             search_attrlist += attrlist
         try:
             results = self.context.search(
@@ -710,7 +728,7 @@ class LDAPUsers(LDAPPrincipals, UgmUsers):
             login = id
         user_id = self.id_for_login(decode_utf8(login))
         criteria = {self._key_attr: user_id}
-        attrlist = ['dn']
+        attrlist = ['dn'] + self.context.root.search_attrlist
         if self.expiresAttr:
             attrlist.append(self.expiresAttr)
         try:
