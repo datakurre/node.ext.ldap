@@ -11,6 +11,7 @@ from node.behaviors import Storage
 from node.behaviors.alias import DictAliaser
 from node.ext.ldap._node import LDAPNode
 from node.ext.ldap.base import decode_utf8
+from node.ext.ldap.base import md5digest
 from node.ext.ldap.interfaces import ILDAPGroupsConfig as IGroupsConfig
 from node.ext.ldap.interfaces import ILDAPUsersConfig as IUsersConfig
 from node.ext.ldap.scope import BASE
@@ -331,9 +332,31 @@ class LDAPGroupMapping(Behavior):
                     criteria=criteria,
                     attrlist=attrlist,
                 )
-                return [
-                    att[users._key_attr][0] for _, att in matches_generator
-                ]
+                matches = []
+                for dn, match in matches_generator:
+
+                    # Generate cached result for each member
+                    if self.context._ldap_session._communicator._cache:
+                        key_items = [
+                            ugm.props.user, ugm.ucfg.baseDN,
+                            [attr for attr in attrlist if attr != 'rdn'], 0,
+                            '(&{0:s}({1:s}={2:s}))'.format(
+                                ugm.ucfg.queryFilter,
+                                users._key_attr,
+                                match[users._key_attr][0]
+                            ),
+                            ugm.ucfg.scope,
+                            None,
+                            # page_size
+                            None,
+                            # cookie
+                        ]
+                        key = md5digest('-'.join([str(_) for _ in key_items]))
+                        self.context._ldap_session._communicator._cache.set(
+                            key, [(dn, match)])
+
+                    matches.append(match[users._key_attr][0])
+                return matches
         ret = list()
         members = self.context.attrs.get(self._member_attribute, list())
         for member in members:
