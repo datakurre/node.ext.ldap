@@ -623,10 +623,7 @@ class LDAPPrincipals(OdictStorage):
             for _, att in results:
                 user_id = att[self._key_attr][0]
                 aliased = self._alias_dict(att)
-                keys = aliased.keys()
-                for key in keys:
-                    if key not in attrlist:
-                        del aliased[key]
+                # append all matching aliases (in addition to attrlist oness)
                 _results.append((user_id, aliased))
             results = _results
         else:
