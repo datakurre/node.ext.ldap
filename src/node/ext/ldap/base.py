@@ -46,18 +46,6 @@ def md5digest(key):
     return m.hexdigest()
 
 
-def decode_utf8(value):
-    if value and not isinstance(value, unicode):
-        value = value.decode('utf-8')
-    return value
-
-
-def encode_utf8(value):
-    if value and isinstance(value, unicode):
-        value = value.encode('utf-8')
-    return value
-
-
 class LDAPConnector(object):
     """Object is responsible for the LDAP connection.
 
