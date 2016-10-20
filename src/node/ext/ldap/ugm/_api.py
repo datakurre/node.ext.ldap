@@ -443,16 +443,9 @@ class LDAPPrincipals(OdictStorage):
 
         Raise KeyError if not enlisted.
         """
-        # XXX: rename to id_by_dn
-        # XXX: what was strict good for? remove
-        # if strict:
-        #     raise KeyError(dn)
-        try:
-            search = self.context.ldap_session.search
-            res = search(baseDN=dn.encode('utf-8'))[0]
-            return res[1][self._key_attr][0].decode('utf-8')
-        except ldap.NO_SUCH_OBJECT:
-            raise KeyError(dn)
+        node = self.context.node_by_dn(dn, strict)
+        node.attrs.load()
+        return node.attrs[self._key_attr]
 
     @override
     @property
