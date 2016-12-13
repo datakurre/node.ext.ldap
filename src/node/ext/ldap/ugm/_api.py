@@ -636,7 +636,10 @@ class LDAPPrincipals(OdictStorage):
         if attrlist is not None:
             _results = list()
             for _, att in results:
-                user_id = att[self._key_attr][0]
+                try:
+                    user_id = att[self._key_attr][0]
+                except (KeyError, IndexError):
+                    continue
                 aliased = self._alias_dict(att)
                 # append all matching aliases (in addition to attrlist oness)
                 _results.append((user_id, aliased))
